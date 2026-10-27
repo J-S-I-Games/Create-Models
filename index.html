@@ -9,14 +9,21 @@
 <body>
 <header id="menubar">
   <b class="logo">Create Models</b>
-  <div class="menu"><span>Archivo</span><div class="dd">
-    <button data-act="new">Nuevo</button>
-    <button data-act="open">Abrir .JSI… (Ctrl+O)</button>
-    <button data-act="save">Guardar (Ctrl+S)</button>
-    <button data-act="saveas">Guardar como…</button>
-    <hr>
-    <button data-act="obj">Exportar OBJ + MTL</button>
-  </div></div>
+  
+<div class="menu"><span>Archivo</span><div class="dd">
+  <button data-act="new">Nuevo</button>
+  <hr>
+  <button data-act="open">Abrir proyecto .JSI… (Ctrl+O)</button>
+  <button data-act="save">Guardar proyecto (Ctrl+S)</button>
+  <button data-act="saveas">Guardar proyecto como…</button>
+  <hr>
+  <button data-act="importmodel">Importar modelo 3D…</button>
+  <hr>
+  <button data-act="obj">Exportar OBJ</button>
+  <button data-act="fbx">Exportar FBX</button>
+  <button data-act="glb">Exportar GLB</button>
+</div></div>
+
   <div class="menu"><span>Editar</span><div class="dd">
     <button data-act="undo">Deshacer (Ctrl+Z)</button>
     <button data-act="redo">Rehacer (Ctrl+Y)</button>
@@ -171,12 +178,29 @@
 <input type="file" id="texfile" accept="image/*" hidden>
 <input type="file" id="reffile" accept="image/png,image/jpeg,image/webp" multiple hidden>
 
-<!-- Three.js (build global, sin módulos: funciona también abriendo el archivo directamente) -->
+<input
+  type="file"
+  id="importModelFile"
+  accept=".obj,.fbx,.glb,.gltf"
+  hidden
+>
+
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+
+
 
 <script src="./modifiers.js"></script>
 <script src="./meshcut.js"></script>

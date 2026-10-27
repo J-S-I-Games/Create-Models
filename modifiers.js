@@ -1,5 +1,4 @@
-/* Create Models: modificadores sobre una "sopa de triángulos" (Float32Array, 9 floats por triángulo).
-   Sin dependencias: cada función recibe posiciones y devuelve posiciones nuevas. */
+
 (function (g) {
 'use strict';
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -13,7 +12,7 @@ const nrm3 = a => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]
 const len2 = a => a[0] * a[0] + a[1] * a[1] + a[2] * a[2];
 const ek = (a, b) => (a < b ? a + '_' + b : b + '_' + a);
 
-function weld(P) { // une vértices en la misma posición
+function weld(P) {
   const map = new Map(), pos = [], tris = [];
   const id = i => {
     const k = Math.round(P[i] * 1e4) + ',' + Math.round(P[i + 1] * 1e4) + ',' + Math.round(P[i + 2] * 1e4);
@@ -33,7 +32,6 @@ function soup(pos, tris) {
   return out;
 }
 
-// Mirror: copia reflejada en un eje local (0=X, 1=Y, 2=Z) con el sentido de las caras invertido
 function mirror(P, axis) {
   const out = new Float32Array(P.length * 2);
   out.set(P);
@@ -45,7 +43,6 @@ function mirror(P, axis) {
   return out;
 }
 
-// Solidify: segunda capa desplazada hacia adentro + borde en los contornos abiertos
 function solidify(P, th) {
   const { pos, tris } = weld(P), N = pos.length, n = pos.map(() => [0, 0, 0]);
   tris.forEach(([a, b, c]) => { const f = cross(sub(pos[b], pos[a]), sub(pos[c], pos[a])); [a, b, c].forEach(i => add(n[i], f)); });
@@ -61,7 +58,6 @@ function solidify(P, th) {
   return soup(all, out);
 }
 
-// Subdivision Surface: subdivisión de Loop (cada triángulo en 4, con suavizado)
 function subdivide(P) {
   const { pos, tris } = weld(P), E = new Map(), nb = pos.map(() => new Set());
   tris.forEach(([a, b, c]) => [[a, b, c], [b, c, a], [c, a, b]].forEach(([x, y, z]) => {
@@ -93,7 +89,6 @@ function subdivide(P) {
   return soup(out, nt);
 }
 
-// Bevel (chaflán): cada cara plana se encoge, las aristas se cubren con una tira y los vértices con un polígono
 function bevel(P, amt) {
   const { pos, tris } = weld(P), np = pos.slice(), out = [], E = new Map(), badV = new Set();
   const fn = tris.map(([a, b, c]) => nrm(cross(sub(pos[b], pos[a]), sub(pos[c], pos[a]))));
@@ -126,7 +121,7 @@ function bevel(P, amt) {
       if (v === loop[0]) break;
       loop.push(v);
     }
-    if (loop.length !== next.size) return; // varios contornos: se deja la cara como está
+    if (loop.length !== next.size) return;
     const c = [0, 0, 0];
     loop.forEach(v => add(c, pos[v]));
     c.forEach((_, k) => { c[k] /= loop.length; });
@@ -158,7 +153,6 @@ function bevel(P, amt) {
   return soup(np, out);
 }
 
-// Desenvolver UV: devuelve 2 floats por vértice. kind: 'box' (atlas de 6 caras), 'plane', 'cyl', 'sph'
 function unwrap(P, kind) {
   const n = P.length / 3, uv = new Float32Array(n * 2), mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
   for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { const v = P[i * 3 + k]; if (v < mn[k]) mn[k] = v; if (v > mx[k]) mx[k] = v; }
@@ -175,10 +169,10 @@ function unwrap(P, kind) {
         u.push(Math.atan2(x, z) / (2 * Math.PI) + 0.5);
         v.push(kind === 'cyl' ? (P[i * 3 + 1] - mn[1]) / sz[1] : 0.5 + Math.asin(Math.max(-1, Math.min(1, y / (Math.hypot(x, y, z) || 1)))) / Math.PI);
       }
-      if (Math.max(...u) - Math.min(...u) > 0.5) for (let k = 0; k < 3; k++) if (u[k] < 0.5) u[k] += 1; // costura
+      if (Math.max(...u) - Math.min(...u) > 0.5) for (let k = 0; k < 3; k++) if (u[k] < 0.5) u[k] += 1;
       for (let k = 0; k < 3; k++) set(t + k, u[k], v[k]);
     }
-  } else { // caja: cada cara en su celda de un atlas de 3x2
+  } else { 
     const L = [p => [-p[2], p[1]], p => [p[2], p[1]], p => [p[0], -p[2]], p => [p[0], p[2]], p => [p[0], p[1]], p => [-p[0], p[1]]];
     const gi = [], loc = [], bb = Array.from({ length: 6 }, () => [1e9, 1e9, -1e9, -1e9]);
     for (let t = 0; t + 2 < n; t += 3) {
@@ -197,9 +191,7 @@ function unwrap(P, kind) {
   return uv;
 }
 
-// ---------- UV: proyección desde la vista, Smart UV, Unwrap, islas y superposiciones ----------
-// Todo trabaja sobre la sopa de triángulos (3 vértices por triángulo) y devuelve 2 floats por vértice.
-function weldAll(S) { // une vértices por posición pero conserva TODOS los triángulos (la numeración no cambia)
+function weldAll(S) {
   const map = new Map(), pos = [], tris = [];
   const id = i => {
     const k = Math.round(S[i * 3] * 1e4) + ',' + Math.round(S[i * 3 + 1] * 1e4) + ',' + Math.round(S[i * 3 + 2] * 1e4);
@@ -210,7 +202,7 @@ function weldAll(S) { // une vértices por posición pero conserva TODOS los tri
   for (let t = 0; t < S.length / 9; t++) tris.push([id(t * 3), id(t * 3 + 1), id(t * 3 + 2)]);
   return { pos, tris };
 }
-function fromView(S, proj) { // proyección desde la vista: proj(p) -> [x, y] en pantalla (y hacia arriba); se ajusta a 0-1 sin deformar
+function fromView(S, proj) { 
   const n = S.length / 3, xy = [];
   let x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
   for (let i = 0; i < n; i++) { const q = proj([S[i * 3], S[i * 3 + 1], S[i * 3 + 2]]); xy.push(q); x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
@@ -218,7 +210,7 @@ function fromView(S, proj) { // proyección desde la vista: proj(p) -> [x, y] en
   xy.forEach((q, i) => { uv[i * 2] = (q[0] - x0) * k + (1 - w * k) / 2; uv[i * 2 + 1] = (q[1] - y0) * k + (1 - h * k) / 2; });
   return uv;
 }
-function charts(S, o) { // islas por ángulo; unfold=false: proyección plana por isla (Smart UV); unfold=true: se desarrolla la isla triángulo a triángulo (Unwrap)
+function charts(S, o) { 
   const { pos, tris } = weldAll(S), nT = tris.length, cosA = Math.cos((o.angle || 66) * Math.PI / 180);
   const nrm = tris.map(([a, b, c]) => nrm3(cross(sub(pos[b], pos[a]), sub(pos[c], pos[a]))));
   const E = new Map();
@@ -242,7 +234,7 @@ function charts(S, o) { // islas por ángulo; unfold=false: proyección plana po
   }
   const c2 = new Array(nT);
   list.forEach(ts => {
-    if (!o.unfold) { // proyección plana a lo largo de la normal media de la isla
+    if (!o.unfold) {
       const n = nrm3(ts.reduce((a, t) => add(a, nrm[t]), [0, 0, 0])), u = nrm3(cross(Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], n)), v = cross(n, u);
       ts.forEach(t => { c2[t] = tris[t].map(i => [dot(pos[i], u), dot(pos[i], v)]); });
       return;
@@ -262,7 +254,7 @@ function charts(S, o) { // islas por ángulo; unfold=false: proyección plana po
         const third = tris[m].find(v => !shared.includes(v)), cp = c2[p][tris[p].findIndex(v => !shared.includes(v))];
         const ex = [B[0] - A[0], B[1] - A[1]], Le = Math.hypot(ex[0], ex[1]) || 1e-9, ux = [ex[0] / Le, ex[1] / Le], uy = [-ux[1], ux[0]];
         const da2 = len2(sub(pos[third], pos[va])), db2 = len2(sub(pos[third], pos[vb])), px = (da2 - db2 + Le * Le) / (2 * Le), py = Math.sqrt(Math.max(0, da2 - px * px));
-        const side = (cp[0] - A[0]) * uy[0] + (cp[1] - A[1]) * uy[1] >= 0 ? 1 : -1; // el tercer vértice va del lado opuesto al del triángulo anterior
+        const side = (cp[0] - A[0]) * uy[0] + (cp[1] - A[1]) * uy[1] >= 0 ? 1 : -1; 
         const T = [A[0] + ux[0] * px - uy[0] * py * side, A[1] + ux[1] * px - uy[1] * py * side];
         c2[m] = tris[m].map(v => (v === va ? A : v === vb ? B : T));
         placed.add(m); q.push(m);
@@ -272,7 +264,7 @@ function charts(S, o) { // islas por ángulo; unfold=false: proyección plana po
   });
   return packCharts(list, c2, nT);
 }
-function packCharts(list, c2, nT, norot) { // gira cada isla a su caja mínima y las ordena en filas dentro de 0-1
+function packCharts(list, c2, nT, norot) { 
   const info = list.map(ts => {
     let best = null;
     for (let k = 0; k < (norot ? 1 : 12); k++) {
@@ -312,7 +304,7 @@ function triSub(P, mask) {
   idx.forEach((t, i) => S.set(P.subarray(t * 9, t * 9 + 9), i * 9));
   return { idx, S };
 }
-// kind: 'view' (o.proj), 'smart', 'unwrap', 'box', 'plane', 'cyl', 'sph'. o.mask limita el cálculo a los triángulos marcados; o.base conserva el UV del resto.
+
 function uvTool(P, kind, o) {
   o = o || {};
   const nT = P.length / 9, out = new Float32Array(nT * 6);
@@ -323,14 +315,14 @@ function uvTool(P, kind, o) {
   idx.forEach((t, i) => out.set(sub6.subarray(i * 6, i * 6 + 6), t * 6));
   return out;
 }
-function islandIds(nT, keyOf) { // islas UV: triángulos que comparten un vértice con la misma posición y el mismo UV
+function islandIds(nT, keyOf) { 
   const par = Array.from({ length: nT }, (_, i) => i), find = x => (par[x] === x ? x : (par[x] = find(par[x]))), owner = new Map();
   for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) { const key = keyOf(t * 3 + k); if (owner.has(key)) par[find(t)] = find(owner.get(key)); else owner.set(key, t); }
   const ids = new Int32Array(nT), map = new Map();
   for (let t = 0; t < nT; t++) { const r = find(t); if (!map.has(r)) map.set(r, map.size); ids[t] = map.get(r); }
   return ids;
 }
-function uvOverlap(nT, uvOf, N) { // celdas del espacio UV cubiertas por más de un triángulo (superposición dentro de una isla o entre islas)
+function uvOverlap(nT, uvOf, N) {
   N = N || 128;
   const own = new Int32Array(N * N).fill(-1), mask = new Uint8Array(N * N), e = 1e-9;
   let count = 0;
@@ -342,7 +334,7 @@ function uvOverlap(nT, uvOf, N) { // celdas del espacio UV cubiertas por más de
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const px = (x + 0.5) / N, py = (y + 0.5) / N;
       const l1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / den, l2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / den;
-      if (l1 <= e || l2 <= e || 1 - l1 - l2 <= e) continue; // solo el interior: las aristas compartidas no cuentan
+      if (l1 <= e || l2 <= e || 1 - l1 - l2 <= e) continue; 
       const i = y * N + x;
       if (own[i] < 0) own[i] = t; else if (own[i] !== t && !mask[i]) { mask[i] = 1; count++; }
     }
@@ -350,7 +342,7 @@ function uvOverlap(nT, uvOf, N) { // celdas del espacio UV cubiertas por más de
   return { mask, count, N };
 }
 
-function packIslands(nT, uvOf, isl) { // reubica todas las islas UV dentro de 0-1 sin girarlas ni deformarlas
+function packIslands(nT, uvOf, isl) { 
   const lists = [], c2 = [];
   for (let t = 0; t < nT; t++) { (lists[isl[t]] = lists[isl[t]] || []).push(t); c2[t] = [0, 1, 2].map(k => uvOf(t * 3 + k).slice()); }
   return packCharts(lists.filter(Boolean), c2, nT, true);

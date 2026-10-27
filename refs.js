@@ -1,9 +1,6 @@
-/* Create Models: imágenes de referencia. Lógica pura (sin dependencias): qué vista ortográfica está activa y dónde va cada plano. */
 (function (g) {
 'use strict';
 const PI = Math.PI;
-// dir: hacia dónde mira la cámara en esa vista. u / v: derecha y arriba de la pantalla. n: normal del plano (mira a la cámara).
-// euler: rotación del plano (Three.js, orden XYZ) para que su ancho/alto coincidan con u / v.
 const VIEWS = {
   front:  { name: 'Frontal',           dir: [0, 0, -1], u: [1, 0, 0],  v: [0, 1, 0],  n: [0, 0, 1],  euler: [0, 0, 0] },
   back:   { name: 'Trasera',           dir: [0, 0, 1],  u: [-1, 0, 0], v: [0, 1, 0],  n: [0, 0, -1], euler: [0, PI, 0] },
@@ -12,18 +9,18 @@ const VIEWS = {
   top:    { name: 'Superior',          dir: [0, -1, 0], u: [1, 0, 0],  v: [0, 0, -1], n: [0, 1, 0],  euler: [-PI / 2, 0, 0] },
   bottom: { name: 'Inferior',          dir: [0, 1, 0],  u: [1, 0, 0],  v: [0, 0, 1],  n: [0, -1, 0], euler: [PI / 2, 0, 0] }
 };
-const DEPTH = 50; // los planos quedan detrás del modelo (respecto de la cámara), así nunca tapan la geometría
-function viewOf(forward, ortho, tol) { // vista ortográfica alineada con un eje, o null (perspectiva o vista libre)
+const DEPTH = 50; 
+function viewOf(forward, ortho, tol) { 
   if (!ortho) return null;
   const l = Math.hypot(forward[0], forward[1], forward[2]) || 1, f = forward.map(x => x / l), t = tol || 0.9998;
   for (const k in VIEWS) { const d = VIEWS[k].dir; if (f[0] * d[0] + f[1] * d[1] + f[2] * d[2] >= t) return k; }
   return null;
 }
-function placement(view, x, y) { // posición del centro del plano, desplazado (x, y) dentro de su propio plano
+function placement(view, x, y) { 
   const V = VIEWS[view];
   return { pos: [0, 1, 2].map(i => V.dir[i] * DEPTH + V.u[i] * x + V.v[i] * y), euler: V.euler.slice() };
 }
-function sanitize(list) { // lista guardada en el .JSI -> lista válida (se descarta lo que no sirva)
+function sanitize(list) { 
   if (!Array.isArray(list)) return [];
   const num = (v, d, a, b) => (Number.isFinite(v) ? Math.min(b, Math.max(a, v)) : d);
   return list.filter(r => r && typeof r.data === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(r.data) && VIEWS[r.view]).map(r => ({

@@ -1,5 +1,4 @@
-/* Create Models: malla poligonal editable y herramientas de corte (Loop Cut y Knife).
-   Sin dependencias: trabaja en el espacio local del objeto y recibe la cámara como funciones. */
+
 (function (g) {
 'use strict';
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -12,7 +11,6 @@ const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 
 const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 const ekey = (a, b) => (a < b ? a + '_' + b : b + '_' + a);
 
-/* ---------- Malla: { pos: [[x,y,z]], faces: [{ v: [ids], uv: [[u,v]] | null, origin }], scale } ---------- */
 function fromSoup(P, UV, faceTris) {
   const map = new Map(), pos = [], nT = Math.floor(P.length / 9);
   const id = i => {
@@ -30,7 +28,7 @@ function fromSoup(P, UV, faceTris) {
   }
   const E = new Map();
   tris.forEach((t, i) => { if (!t) return; for (let k = 0; k < 3; k++) { const key = ekey(t[k], t[(k + 1) % 3]); if (!E.has(key)) E.set(key, []); E.get(key).push(i); } });
-  const poly = ts => { // contorno ordenado de un grupo de triángulos
+  const poly = ts => {
     if (ts.length === 1) return { v: tris[ts[0]].slice(), uv: tuv[ts[0]] ? tuv[ts[0]].map(u => u.slice()) : null };
     const dirs = new Set(), uvOf = new Map(), next = new Map();
     let cnt = 0, ok = true;
@@ -57,11 +55,11 @@ function fromSoup(P, UV, faceTris) {
     return { v: loop, uv: uvOf.size === loop.length ? loop.map(u => uvOf.get(u).slice()) : null };
   };
   let groups;
-  if (faceTris && faceTris.reduce((s, n) => s + n, 0) === nT) { // topología guardada: cada cara = su rango de triángulos
+  if (faceTris && faceTris.reduce((s, n) => s + n, 0) === nT) {
     groups = [];
     let c = 0;
     faceTris.forEach(n => { const gr = []; for (let k = 0; k < n; k++) if (tris[c + k]) gr.push(c + k); c += n; if (gr.length) groups.push(gr); });
-  } else { // mallas sin topología guardada: se deduce (triángulos coplanares vecinos y pares consecutivos = quads)
+  } else { 
     const par = tris.map((_, i) => i), find = x => (par[x] === x ? x : (par[x] = find(par[x])));
     const nrm = tris.map(t => { if (!t) return null; const n = cross(sub(pos[t[1]], pos[t[0]]), sub(pos[t[2]], pos[t[0]])), l = len(n) || 1; return mul(n, 1 / l); });
     E.forEach(l => { if (l.length === 2 && dot(nrm[l[0]], nrm[l[1]]) > 0.9999) par[find(l[0])] = find(l[1]); });
@@ -87,7 +85,7 @@ function fromSoup(P, UV, faceTris) {
 function clone(M) {
   return { pos: M.pos.map(p => p.slice()), faces: M.faces.map((f, i) => ({ v: f.v.slice(), uv: f.uv ? f.uv.map(u => u.slice()) : null, origin: i })), scale: M.scale };
 }
-function faceNormal(M, f) { // normal de Newell (sirve para polígonos con vértices alineados)
+function faceNormal(M, f) {
   let x = 0, y = 0, z = 0;
   const n = f.v.length;
   for (let i = 0; i < n; i++) {
@@ -108,7 +106,7 @@ function inPoly(M, f, p) {
   }
   return c;
 }
-function triangulate(poly, pos) { // recorte de orejas: devuelve triángulos como índices dentro de poly
+function triangulate(poly, pos) {
   const n = poly.length;
   if (n === 3) return [[0, 1, 2]];
   const N = faceNormal({ pos }, { v: poly });
@@ -128,7 +126,7 @@ function triangulate(poly, pos) { // recorte de orejas: devuelve triángulos com
   out.push([idx[0], idx[1], idx[2]]);
   return out;
 }
-function toSoup(M) { // triángulos agrupados por cara: faceTris guarda cuántos tiene cada una
+function toSoup(M) { 
   const P = [], UV = [], faceTris = [], hasUV = M.faces.every(f => f.uv);
   M.faces.forEach(f => {
     const tri = triangulate(f.v, M.pos);
@@ -137,7 +135,7 @@ function toSoup(M) { // triángulos agrupados por cara: faceTris guarda cuántos
   });
   return { P: Float32Array.from(P), UV: hasUV ? Float32Array.from(UV) : null, faceTris };
 }
-function insertOnEdge(M, a, b, list) { // list: [{id, t}] con t creciente de a hacia b; actualiza todas las caras vecinas
+function insertOnEdge(M, a, b, list) {
   M.faces.forEach(f => {
     const n = f.v.length;
     for (let k = 0; k < n; k++) {
@@ -153,8 +151,7 @@ function insertOnEdge(M, a, b, list) { // list: [{id, t}] con t creciente de a h
   });
 }
 
-/* ---------- Loop Cut ---------- */
-function ringOf(M, a, b) { // anillo de quads que atraviesa la arista (a,b); null si no hay quads o el anillo se tuerce
+function ringOf(M, a, b) {
   const eq = new Map();
   M.faces.forEach((f, i) => { if (f.v.length === 4) f.v.forEach((v, k) => { const key = ekey(v, f.v[(k + 1) % 4]); if (!eq.has(key)) eq.set(key, []); eq.get(key).push(i); }); });
   const qs = eq.get(ekey(a, b));
@@ -177,12 +174,12 @@ function ringOf(M, a, b) { // anillo de quads que atraviesa la arista (a,b); nul
   if (qs[1] !== undefined) walk(qs[1], a, b);
   return ring.twist ? null : ring;
 }
-const cutFracs = (n, f) => { // posiciones de los cortes sobre cada arista (desde su vértice inicial); f desliza el corte
+const cutFracs = (n, f) => { 
   const t = [];
   for (let k = 1; k <= n; k++) { const u = k / (n + 1); t.push(u + (f >= 0 ? (1 - u) : u) * f); }
   return t;
 };
-function ringSegments(M, ring, n, f) { // segmentos de vista previa: n líneas por quad del anillo
+function ringSegments(M, ring, n, f) { 
   const tt = cutFracs(n, f), out = [];
   ring.items.forEach(({ fi, i, s }) => {
     const q = M.faces[fi].v, fr = q[i] === s ? tt : tt.slice().reverse().map(x => 1 - x);
@@ -190,7 +187,7 @@ function ringSegments(M, ring, n, f) { // segmentos de vista previa: n líneas p
   });
   return out;
 }
-function loopCut(M, ring, n, f) { // inserta n cortes en la topología (modifica M)
+function loopCut(M, ring, n, f) { 
   const tt = cutFracs(n, f), ids = new Map();
   ring.edges.forEach((e, key) => {
     ids.set(key, tt.map(x => { M.pos.push(lerp3(M.pos[e.s], M.pos[e.o], x)); return M.pos.length - 1; }));
@@ -214,7 +211,7 @@ function loopCut(M, ring, n, f) { // inserta n cortes en la topología (modifica
   return M;
 }
 
-/* ---------- Cámara abstracta: cam.project(p) -> [x, y]; cam.ray(x, y) -> { o, d } (espacio local) ---------- */
+
 function rayFaces(M, o, d) {
   const hits = [];
   M.faces.forEach((f, i) => {
@@ -227,12 +224,12 @@ function rayFaces(M, o, d) {
   });
   return hits.sort((a, b) => a.t - b.t);
 }
-function visible(M, cam, p) { // el punto no está tapado por otra parte de la malla
+function visible(M, cam, p) { 
   const s = cam.project(p), r = cam.ray(s[0], s[1]), dd = dot(r.d, r.d), tp = dot(sub(p, r.o), r.d) / dd;
   const h = rayFaces(M, r.o, r.d)[0];
   return !h || h.t >= tp - (M.scale * 1e-3 + 1e-6) / Math.sqrt(dd);
 }
-function segT(r, a, b) { // parámetro del punto de la arista más cercano al rayo
+function segT(r, a, b) {
   const v = sub(b, a), w = sub(r.o, a), A = dot(r.d, r.d), B = dot(r.d, v), C = dot(v, v), D = dot(r.d, w), E = dot(v, w), den = A * C - B * B;
   return den < 1e-14 ? 0 : Math.min(1, Math.max(0, (A * E - B * D) / den));
 }
@@ -241,7 +238,7 @@ function edgeList(M) {
   M.faces.forEach(f => f.v.forEach((v, k) => { const w = f.v[(k + 1) % f.v.length], key = ekey(v, w); if (!m.has(key)) m.set(key, [Math.min(v, w), Math.max(v, w)]); }));
   return m;
 }
-function edgeAt(M, cam, sx, sy, rad, ok) { // arista visible más cercana al cursor
+function edgeAt(M, cam, sx, sy, rad, ok) {
   let best = rad, hit = null;
   const S = M.pos.map(p => cam.project(p));
   edgeList(M).forEach(([a, b], key) => {
@@ -255,7 +252,7 @@ function edgeAt(M, cam, sx, sy, rad, ok) { // arista visible más cercana al cur
   });
   return hit;
 }
-function faceEdgeAt(M, cam, sx, sy, ok) { // como Blender: la cara bajo el cursor elige la arista más cercana (no hace falta apuntar a una arista)
+function faceEdgeAt(M, cam, sx, sy, ok) { 
   const r = cam.ray(sx, sy), h = rayFaces(M, r.o, r.d)[0];
   if (!h) return null;
   const F = M.faces[h.f], n = F.v.length;
@@ -271,7 +268,7 @@ function faceEdgeAt(M, cam, sx, sy, ok) { // como Blender: la cara bajo el curso
   const t = segT(r, M.pos[hit[0]], M.pos[hit[1]]);
   return { kind: 'e', a: hit[0], b: hit[1], t, p: lerp3(M.pos[hit[0]], M.pos[hit[1]], t), f: h.f };
 }
-function snapAt(M, cam, sx, sy) { // vértice > arista > punto de una cara (solo lo visible)
+function snapAt(M, cam, sx, sy) {
   const used = new Set();
   M.faces.forEach(f => f.v.forEach(v => used.add(v)));
   let best = 10, hv = -1;
@@ -282,7 +279,7 @@ function snapAt(M, cam, sx, sy) { // vértice > arista > punto de una cara (solo
   const r = cam.ray(sx, sy), h = rayFaces(M, r.o, r.d)[0];
   return h ? { kind: 'f', f: h.f, p: h.p } : null;
 }
-function incident(M, d) { // caras que contienen al punto
+function incident(M, d) {
   if (d.kind === 'f') return [d.f];
   const out = [];
   M.faces.forEach((f, i) => {
@@ -292,8 +289,6 @@ function incident(M, d) { // caras que contienen al punto
   });
   return out;
 }
-// Tramo A -> B visto desde la cámara: cruza las aristas visibles que corta la línea en pantalla.
-// Devuelve { seq: [A, ...cruces, B], faces: [cara de cada tramo, -1 si recorre una arista existente] } o null.
 function resolvePath(M, cam, A, B) {
   const sA = cam.project(A.p), sB = cam.project(B.p), r = [sB[0] - sA[0], sB[1] - sA[1]];
   const ex = { v: new Set(), e: new Set() };
@@ -324,13 +319,12 @@ function resolvePath(M, cam, A, B) {
   return { seq, faces };
 }
 
-/* ---------- Knife: divide las caras recorridas por la ruta (modifica una copia) ---------- */
 function newVert(M, p, eps) {
   for (let i = 0; i < M.pos.length; i++) if (len(sub(M.pos[i], p)) < eps) return i;
   M.pos.push(p.slice());
   return M.pos.length - 1;
 }
-function pointOnEdge(M, P, eps) { // vértice existente, o vértice nuevo insertado en la arista que contiene a P (-1 si no hay)
+function pointOnEdge(M, P, eps) { 
   for (let i = 0; i < M.pos.length; i++) if (len(sub(M.pos[i], P)) < eps) return i;
   for (const f of M.faces) {
     const n = f.v.length;
@@ -346,7 +340,7 @@ function pointOnEdge(M, P, eps) { // vértice existente, o vértice nuevo insert
   }
   return -1;
 }
-function affineUV(M, F, p) { // UV de un punto interior de la cara (ajuste afín con los vértices de la cara)
+function affineUV(M, F, p) { 
   const P0 = M.pos[F.v[0]], n = F.v.length;
   let best = -1, j = 1, k = 2;
   for (let a = 1; a < n; a++) for (let b = a + 1; b < n; b++) { const c = len(cross(sub(M.pos[F.v[a]], P0), sub(M.pos[F.v[b]], P0))); if (c > best) { best = c; j = a; k = b; } }
@@ -356,7 +350,7 @@ function affineUV(M, F, p) { // UV de un punto interior de la cara (ajuste afín
   const al = (wu * vv - wv * uv) / det, be = (wv * uu - wu * uv) / det;
   return [F.uv[0][0] + al * (F.uv[j][0] - F.uv[0][0]) + be * (F.uv[k][0] - F.uv[0][0]), F.uv[0][1] + al * (F.uv[j][1] - F.uv[0][1]) + be * (F.uv[k][1] - F.uv[0][1])];
 }
-function extendToEdge(M, F, p, dir, eps) { // prolonga un extremo interior hasta el borde de la cara
+function extendToEdge(M, F, p, dir, eps) { 
   const q = proj2(faceNormal(M, F)), P2 = q(p), D2 = q(add(p, dir)), d = [D2[0] - P2[0], D2[1] - P2[1]], n = F.v.length;
   let best = null;
   for (let k = 0; k < n; k++) {
@@ -367,10 +361,10 @@ function extendToEdge(M, F, p, dir, eps) { // prolonga un extremo interior hasta
   }
   return best ? pointOnEdge(M, lerp3(best.x, best.y, best.t), eps) : -1;
 }
-function splitFace(M, F, run) { // divide la cara F siguiendo la ruta (primer y último vértice sobre su contorno)
+function splitFace(M, F, run) { 
   const a = run[0], b = run[run.length - 1], n = F.v.length, ia = F.v.indexOf(a), ib = F.v.indexOf(b), inner = run.slice(1, -1);
   if (a === b || ia < 0 || ib < 0) return;
-  if (!inner.length && ((ia + 1) % n === ib || (ib + 1) % n === ia)) return; // ya es una arista
+  if (!inner.length && ((ia + 1) % n === ib || (ib + 1) % n === ia)) return;
   const seg = (i, j) => { const o = []; for (let k = i; ; k = (k + 1) % n) { o.push(k); if (k === j) break; } return o; };
   const uvIn = F.uv ? inner.map(v => affineUV(M, F, M.pos[v])) : null;
   const mk = (S, ri, ru) => ({ v: S.map(k => F.v[k]).concat(ri), uv: F.uv ? S.map(k => F.uv[k].slice()).concat(ru) : null, origin: F.origin });
@@ -390,7 +384,7 @@ function applyRun(M, run, eps) {
   if (!F.v.includes(v[n - 1])) { const b = extendToEdge(M, F, M.pos[v[n - 1]], sub(M.pos[v[n - 1]], M.pos[v[n - 2]]), eps); if (b < 0) return; v.push(b); }
   splitFace(M, F, v);
 }
-function knife(M0, pts, faces) { // pts: puntos de la ruta; faces[i]: cara que recorre el tramo pts[i] -> pts[i+1]
+function knife(M0, pts, faces) { 
   const M = clone(M0), eps = M.scale * 1e-4;
   const vid = pts.map(d => {
     if (d.kind === 'v') return d.v;

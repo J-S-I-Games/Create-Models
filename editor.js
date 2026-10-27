@@ -3,9 +3,8 @@
 const $ = s => document.querySelector(s);
 const view = $('#viewport');
 
-/* ---------- Escena ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // ligero para PCs de gama baja
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 view.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2b2b2e);
@@ -24,7 +23,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 0.75));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(5, 10, 7);
 scene.add(sun);
-{ // entorno suave para que los metales y el brillo se vean bien
+{
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
   const cx = cv.getContext('2d'), gr = cx.createLinearGradient(0, 0, 0, 128);
   gr.addColorStop(0, '#d5deea'); gr.addColorStop(0.5, '#7a8190'); gr.addColorStop(1, '#2a2c31');
@@ -33,16 +32,15 @@ scene.add(sun);
   const pm = new THREE.PMREMGenerator(renderer);
   scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
 }
-const root = new THREE.Group(); // aquí viven los objetos editables
+const root = new THREE.Group();
 scene.add(root);
 
-// Renderizado bajo demanda: solo dibuja cuando algo cambió
 let need = true;
 const render = () => { need = true; };
 const CLAY = new THREE.MeshStandardMaterial({ color: 0xb4b8c0, roughness: 0.8, metalness: 0, side: THREE.DoubleSide });
 const WIRE = new THREE.MeshBasicMaterial({ color: 0xb4b8c0, wireframe: true });
-let viewMode = 'mat'; // mat = materiales, solid = sólido, wire = alámbrico
-let refsReady = false; // se activa cuando ya existe el sistema de imágenes de referencia (más abajo en este archivo)
+let viewMode = 'mat'; 
+let refsReady = false; 
 (function loop() {
   requestAnimationFrame(loop);
   if (!need) return;
@@ -66,7 +64,6 @@ tc.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; });
 tc.addEventListener('change', () => { refreshProps(); render(); });
 tc.addEventListener('mouseUp', () => { if (edit) finishEditDrag(); else commit(); });
 
-/* ---------- Primitivas ---------- */
 const GEO = {
   box: () => new THREE.BoxGeometry(1, 1, 1),
   sphere: () => new THREE.SphereGeometry(0.5, 24, 16),
@@ -109,7 +106,6 @@ function addObject(type, d = {}) {
 }
 function disposeObj(o) { o.geometry.dispose(); o.material.dispose(); }
 
-/* ---------- Selección ---------- */
 let sel = null;
 function select(o) {
   if (edit) exitEdit();
@@ -132,7 +128,6 @@ renderer.domElement.addEventListener('pointerup', e => {
   select(hit ? hit.object : null);
 });
 
-/* ---------- Modo edición (Tab): vértice / arista / malla ---------- */
 let edit = false, ed = null;
 const pivot = new THREE.Object3D();
 scene.add(pivot);
@@ -141,7 +136,6 @@ function enterEdit() {
   if (!sel) return toast('Selecciona un objeto primero');
   const o = sel, G = o.geometry, P = G.attributes.position, I = G.index;
   const vid = [], map = new Map(), uniq = [];
-  // Une los vértices duplicados (misma posición) para que se muevan juntos
   for (let i = 0; i < P.count; i++) {
     const k = [P.getX(i), P.getY(i), P.getZ(i)].map(v => Math.round(v * 1e4)).join();
     let u = map.get(k);
@@ -151,7 +145,7 @@ function enterEdit() {
   const pv = u => new THREE.Vector3().fromBufferAttribute(P, uniq[u].idx[0]);
   const cnt = I ? I.count : P.count, vi = j => (I ? I.getX(j) : j);
   const tris = [], nrm = [], em = new Map();
-  const ft = o.userData.faceTris; // topología guardada: cada cara es un rango de triángulos
+  const ft = o.userData.faceTris; 
   let fOf = null;
   if (ft && !I && ft.reduce((s, n) => s + n, 0) * 3 === P.count) { fOf = []; let c0 = 0; ft.forEach((n, i) => { for (let k = 0; k < n; k++) fOf[c0++] = i; }); }
   for (let j = 0; j < cnt; j += 3) {
@@ -168,7 +162,6 @@ function enterEdit() {
       e.t.push(ti);
     });
   }
-  // Triángulos coplanares vecinos = una misma cara; su diagonal no se dibuja como arista
   const par = tris.map((_, i) => i), find = x => (par[x] === x ? x : (par[x] = find(par[x])));
   const edges = [];
   em.forEach(e => {
@@ -275,7 +268,6 @@ function editPick(e) {
   }
   updatePivot(); refreshEdit();
 }
-// Mover / rotar / escalar la selección: el gizmo actúa sobre un pivote y se aplica a los vértices
 function startEditDrag() {
   if (!edit || !ed.selV.size) return;
   const o = ed.obj, P = o.geometry.attributes.position;
@@ -304,7 +296,6 @@ function finishEditDrag() {
 tc.addEventListener('mouseDown', startEditDrag);
 tc.addEventListener('objectChange', dragEdit);
 
-/* ---------- Transformación modal: G / R / S + mover el mouse ---------- */
 let mod = null, leftDown = false, noPick = false, mxy = [0, 0];
 const hint = $('#hint');
 const AX = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
@@ -368,7 +359,6 @@ function cancelModal() {
   else { sel.position.copy(mod.p0); sel.quaternion.copy(mod.q0); sel.scale.copy(mod.s0); refreshProps(); }
   endModal();
 }
-// Captura el mouse antes que la cámara y el gizmo mientras dura la transformación
 window.addEventListener('pointermove', e => { mxy = [e.clientX, e.clientY]; updateModal(); cutMove(); }, true);
 window.addEventListener('pointerdown', e => {
   if (e.button === 0) leftDown = true;
@@ -381,11 +371,10 @@ window.addEventListener('pointerdown', e => {
 window.addEventListener('pointerup', e => {
   if (e.button !== 0) return;
   leftDown = false;
-  if (mod && mod.hold) { noPick = true; confirmModal(); } // G/R/S con el clic izquierdo mantenido: al soltar se aplica
+  if (mod && mod.hold) { noPick = true; confirmModal(); }
   if (noPick) setTimeout(() => { noPick = false; });
 }, true);
 
-/* ---------- Menú de edición (Tab), selección y vistas ---------- */
 function selOp(k) {
   if (!edit) return toast('Entra al modo edición (Tab) para seleccionar vértices');
   const n = ed.uniq.length, sv = ed.selV;
@@ -394,8 +383,8 @@ function selOp(k) {
   else for (let i = 0; i < n; i++) { if (sv.has(i)) sv.delete(i); else sv.add(i); }
   updatePivot(); refreshEdit();
 }
-function setView(x, y, z, free) { // free: no cambia la proyección
-  if (!free && $('#autopersp').checked && camera !== ortho) setProj('ortho', true); // vistas numéricas en ortográfica (Auto Perspective)
+function setView(x, y, z, free) {
+  if (!free && $('#autopersp').checked && camera !== ortho) setProj('ortho', true);
   const d = camera.position.distanceTo(orbit.target) || 8;
   camera.position.copy(orbit.target).addScaledVector(new THREE.Vector3(x, y, z).normalize(), d);
   orbit.update(); render();
@@ -408,11 +397,10 @@ function frameAll() {
   orbit.target.copy(c); camera.position.copy(c).addScaledVector(dir, dist); orbit.update(); render();
 }
 
-/* ---------- Corte en bucle (Ctrl+R) y Cuchillo (K) sobre la malla poligonal (meshcut.js) ---------- */
 let lc = null, kn = null, cutQ = false;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-function cutNav(on) { orbit.mouseButtons.MIDDLE = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.DOLLY; } // con una herramienta de corte, el botón central gira la vista (para seguir el loop por detrás)
-function camOf(o) { // cámara para JSIMesh: todo se calcula en el espacio local del objeto (respeta posición, rotación y escala)
+function cutNav(on) { orbit.mouseButtons.MIDDLE = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.DOLLY; } 
+function camOf(o) {
   o.updateMatrixWorld(true);
   const W = o.matrixWorld.clone(), Wi = W.clone().invert(), v = new THREE.Vector3();
   return {
@@ -431,11 +419,11 @@ function camOf(o) { // cámara para JSIMesh: todo se calcula en el espacio local
     }
   };
 }
-function meshOf(o) { // malla poligonal del objeto, con UV y la topología guardada si existe
+function meshOf(o) {
   const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
   return JSIMesh.fromSoup(g.attributes.position.array, g.attributes.uv ? g.attributes.uv.array : null, o.userData.faceTris);
 }
-function commitMesh(o, M, mode) { // escribe la malla cortada en la geometría real y reconstruye la edición
+function commitMesh(o, M, mode) { 
   const { P, UV, faceTris } = JSIMesh.toSoup(M);
   exitEdit();
   applyGeo(o, P, undefined, faceTris);
@@ -460,7 +448,6 @@ function cutMove() { // un cálculo por cuadro como máximo
   requestAnimationFrame(() => { cutQ = false; if (lc) loopMove(); else if (kn) knifeMove(); });
 }
 
-/* Loop Cut: elegir arista, cantidad de cortes (rueda o + / -), clic para fijar y deslizar con el mouse */
 function startLoopCut() {
   if (!edit) return toast('Ctrl+R funciona en modo edición (Tab)');
   if (lc || kn || mod) return;
@@ -476,7 +463,6 @@ function loopMove() {
     const d = (mxy[0] - lc.start[0]) * lc.dir[0] + (mxy[1] - lc.start[1]) * lc.dir[1];
     lc.f = clamp(2 * d / (lc.len * lc.len), -0.95, 0.95);
   } else {
-    // como en Blender: la cara bajo el cursor elige la arista más cercana; si el cursor está fuera de la malla, se busca una arista cercana
     lc.edge = JSIMesh.faceEdgeAt(lc.M, lc.cam, mxy[0], mxy[1], lc.ok) || JSIMesh.edgeAt(lc.M, lc.cam, mxy[0], mxy[1], 12, lc.ok);
     lc.ring = lc.edge && JSIMesh.ringOf(lc.M, lc.edge.a, lc.edge.b);
   }
@@ -504,7 +490,6 @@ function endCut() {
   dropObj(lc.line); lc = null; tc.enabled = true; cutNav(false); setHint(); render();
 }
 
-/* Knife: clic en vértices, aristas o caras; el recorrido cruza las aristas visibles que corta la línea en pantalla */
 function startKnife() {
   if (!edit) return toast('K (cuchillo) funciona en modo edición (Tab)');
   if (lc || kn || mod) return;
@@ -560,7 +545,6 @@ function endKnife() {
   dropObj(kn.line); dropObj(kn.dots); kn = null; tc.enabled = true; cutNav(false); setHint(); render();
 }
 
-/* Entrada de las dos herramientas */
 function cutClick(e) {
   if (e.button === 0) noPick = true;
   if (lc) {
@@ -582,10 +566,8 @@ function cutKey(e, k) {
 }
 window.addEventListener('wheel', e => { if (!lc) return; e.preventDefault(); e.stopPropagation(); loopN(e.deltaY < 0 ? 1 : -1); }, { capture: true, passive: false });
 
-/* ---------- Editor UV (ventana izquierda) ---------- */
 const uvw = $('#uvwin'), uvc = $('#uvcanvas'), uvx = uvc.getContext('2d');
 let ue = null, uvHover = false, uvMode = 'v', uvShowOv = false, uvOvQ = false, uvM = [0, 0];
-// ue: { o, A (atributo uv real), tris, glist (grupos: misma posición + mismo UV), gid, edges, isl, fot, sel, v: {s, x, y}, drag, tool, ov }
 const uvPt = i => [ue.A.getX(i) * ue.v.s + ue.v.x, (1 - ue.A.getY(i)) * ue.v.s + ue.v.y];
 function uvFit() {
   const r = uvc.getBoundingClientRect(), s = Math.min(r.width, r.height) * 0.84;
@@ -597,7 +579,7 @@ function uvRebuild() {
   if (!o || !g.attributes.uv) { ue = null; return uvDraw(); }
   const P = g.attributes.position, A = g.attributes.uv, n = P.count, I = g.index, cnt = I ? I.count : n, vi = j => (I ? I.getX(j) : j);
   const groups = new Map(), gid = new Int32Array(n), glist = [], keep = ue && ue.o === o ? ue.v : null;
-  for (let i = 0; i < n; i++) { // los puntos en la misma posición y con el mismo UV se mueven juntos
+  for (let i = 0; i < n; i++) { 
     const k = Math.round(P.getX(i) * 1e4) + ',' + Math.round(P.getY(i) * 1e4) + ',' + Math.round(P.getZ(i) * 1e4) + '|' + Math.round(A.getX(i) * 1e4) + ',' + Math.round(A.getY(i) * 1e4);
     let gi = groups.get(k);
     if (gi === undefined) { gi = glist.length; groups.set(k, gi); glist.push([]); }
@@ -639,7 +621,7 @@ function uvDraw() {
   if (!ue) { c.fillStyle = '#85858f'; c.font = '12px system-ui'; c.textAlign = 'center'; c.fillText('Selecciona un objeto', r.width / 2, r.height / 2); return; }
   const { s, x, y } = ue.v, m = ue.o.material.map, T = ue.tris, S = ue.sel;
   if (m && m.image) c.drawImage(m.image, x, y, s, s); else { c.fillStyle = '#222226'; c.fillRect(x, y, s, s); }
-  c.lineWidth = 1; // cuadrícula de coordenadas (cada 0.1; más marcada en 0, 0.5 y 1)
+  c.lineWidth = 1; 
   for (let i = 0; i <= 10; i++) {
     c.strokeStyle = i % 5 === 0 ? 'rgba(255,255,255,.30)' : 'rgba(255,255,255,.10)';
     c.beginPath(); c.moveTo(x + s * i / 10, y); c.lineTo(x + s * i / 10, y + s); c.moveTo(x, y + s * i / 10); c.lineTo(x + s, y + s * i / 10); c.stroke();
@@ -649,7 +631,7 @@ function uvDraw() {
   const path = p => { c.beginPath(); c.moveTo(p[0][0], p[0][1]); c.lineTo(p[1][0], p[1][1]); c.lineTo(p[2][0], p[2][1]); c.closePath(); };
   if (T.length < 8000) T.forEach((t, i) => { c.fillStyle = 'hsla(' + ((ue.isl[i] * 67) % 360) + ',65%,55%,0.17)'; path(t.map(uvPt)); c.fill(); }); // cada isla con su color
   T.forEach(t => { if (t.every(v => S.has(v))) { c.fillStyle = 'rgba(240,138,56,.32)'; path(t.map(uvPt)); c.fill(); } });
-  if (uvShowOv && ue.ov) { // superposiciones en rojo
+  if (uvShowOv && ue.ov) { 
     const N = ue.ov.N, cs = s / N;
     c.fillStyle = 'rgba(255,50,50,.6)';
     for (let i = 0; i < N * N; i++) if (ue.ov.mask[i]) c.fillRect(x + (i % N) * cs, y + (1 - (((i / N) | 0) + 1) / N) * s, cs + 0.5, cs + 0.5);
@@ -672,7 +654,7 @@ function uvDraw() {
 }
 function uvPos(e) { const r = uvc.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 function uvTouch() { ue.A.needsUpdate = true; render(); uvDraw(); if (uvShowOv) uvOvSoon(); }
-function uvNear(mx, my) { // grupo de puntos más cercano
+function uvNear(mx, my) {
   let best = 9, hit = -1;
   ue.glist.forEach((l, gi) => { const p = uvPt(l[0]), d = Math.hypot(p[0] - mx, p[1] - my); if (d < best) { best = d; hit = gi; } });
   return hit;
@@ -690,17 +672,17 @@ function uvTriAt(mx, my) {
   for (let t = ue.tris.length - 1; t >= 0; t--) { const p = ue.tris[t].map(uvPt); if (inTri2(mx, my, p[0], p[1], p[2])) return t; }
   return -1;
 }
-function uvTrisOf(t, mode) { // caras (o islas) a las que pertenece el triángulo
+function uvTrisOf(t, mode) { 
   const out = [];
   ue.tris.forEach((_, i) => { if (mode === 'i' ? ue.isl[i] === ue.isl[t] : ue.fot ? ue.fot[i] === ue.fot[t] : i === t) out.push(i); });
   return out;
 }
-function uvIdx(list) { // índices de vértice de una lista de triángulos, con sus puntos pegados (misma posición y UV)
+function uvIdx(list) { 
   const r = [];
   list.forEach(t => ue.tris[t].forEach(v => ue.glist[ue.gid[v]].forEach(i => r.push(i))));
   return r;
 }
-function uvPick(mx, my) { // elemento bajo el cursor según el modo (vértice, arista, cara o isla)
+function uvPick(mx, my) {
   if (uvMode === 'v') { const gi = uvNear(mx, my); return gi >= 0 ? ue.glist[gi] : null; }
   if (uvMode === 'e') { const e = uvEdgeNear(mx, my); return e ? [...ue.glist[ue.gid[e[0]]], ...ue.glist[ue.gid[e[1]]]] : null; }
   const t = uvTriAt(mx, my);
@@ -764,7 +746,6 @@ uvc.addEventListener('wheel', e => {
   const [mx, my] = uvPos(e), f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
   ue.v.x = mx - (mx - ue.v.x) * f; ue.v.y = my - (my - ue.v.y) * f; ue.v.s *= f; uvDraw();
 }, { passive: false });
-/* G / R / S dentro del editor UV (con el mouse sobre el mapa): mover, rotar y escalar lo seleccionado */
 function uvStartTool(m) {
   if (!ue || !ue.sel.size) return toast('Selecciona puntos, aristas, caras o islas en el editor UV primero');
   const ids = [...ue.sel], A = ue.A;
@@ -789,7 +770,7 @@ function uvToolEnd(ok) {
   if (ok) { ue.o.userData.customUV = true; commit(); }
   uvDraw();
 }
-function uvKeys(e, k) { // devuelve true si la tecla se usó en el editor UV
+function uvKeys(e, k) {
   if (uvw.hidden || !ue) return false;
   if (ue.tool) {
     e.preventDefault();
@@ -811,7 +792,7 @@ function uvToggle() {
   $('#toolbar [data-act="uv"]').classList.toggle('on', !uvw.hidden);
   if (!uvw.hidden) { ue = null; uvRebuild(); }
 }
-function uvOp(k) { // botones del editor UV
+function uvOp(k) {
   if (!ue) return toast('Selecciona un objeto primero');
   const A = ue.A;
   if (k === 'ovl') {
@@ -841,7 +822,7 @@ function uvOp(k) { // botones del editor UV
 }
 function uvAction(k) { if (k === 'close') uvToggle(); else uvOp(k); }
 const UVMSG = { unwrap: 'Unwrap aplicado', smart: 'Smart UV Project aplicado', box: 'Proyección cúbica aplicada', cyl: 'Proyección cilíndrica aplicada', sph: 'Proyección esférica aplicada', plane: 'Proyección plana aplicada', view: 'UV proyectados desde la vista actual', orig: 'UV restablecidos' };
-function uvProject(kind) { // genera UV; si hay caras seleccionadas (en 3D o en el editor UV) solo se tocan esas
+function uvProject(kind) { 
   if (!sel) return toast('Selecciona un objeto primero');
   const o = sel, wasEdit = edit, mode = edit && ed.mode;
   if (kind === 'orig') {
@@ -853,10 +834,10 @@ function uvProject(kind) { // genera UV; si hay caras seleccionadas (en 3D o en 
   } else {
     const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = new Float32Array(g.attributes.position.array), nT = P.length / 9;
     let mask = null;
-    if (edit && ed.selV.size) { // caras seleccionadas en el modo edición 3D
+    if (edit && ed.selV.size) { 
       mask = new Uint8Array(nT);
       ed.faces.forEach(f => { if ([...f.verts].every(v => ed.selV.has(v))) f.tris.forEach(t => { mask[t] = 1; }); });
-    } else if (!edit && ue && ue.o === o && ue.sel.size) { // triángulos seleccionados en el editor UV
+    } else if (!edit && ue && ue.o === o && ue.sel.size) {
       mask = new Uint8Array(nT);
       ue.tris.forEach((t, i) => { if (t.every(v => ue.sel.has(v))) mask[i] = 1; });
     }
@@ -878,7 +859,6 @@ document.addEventListener('change', e => {
   e.target.value = '';
 });
 
-/* ---------- Imágenes de referencia (solo se ven en la vista ortográfica asignada) ---------- */
 const refGroup = new THREE.Group();
 scene.add(refGroup);
 let refs = [], refId = 0, refOrd = 0, autoOrtho = false;
@@ -886,7 +866,7 @@ const refDir = new THREE.Vector3(), vname = $('#vname');
 const camDir = () => camera.getWorldDirection(refDir).toArray();
 const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function refsOut() { return refs.slice().sort((a, b) => a.ord - b.ord).map(r => ({ name: r.name, view: r.view, x: r.x, y: r.y, size: r.size, opacity: r.opacity, visible: r.visible, data: r.data })); }
-function refPlace(r) { // posición y orientación dentro del plano de su vista; el ancho/alto no deforman la imagen
+function refPlace(r) { 
   const pl = JSIRefs.placement(r.view, r.x, r.y);
   r.mesh.position.set(pl.pos[0], pl.pos[1], pl.pos[2]); r.mesh.rotation.set(pl.euler[0], pl.euler[1], pl.euler[2]);
   r.mesh.scale.set(r.size, r.size * r.aspect, 1); r.mesh.material.opacity = r.opacity;
@@ -896,7 +876,7 @@ function refMake(d, cb) {
   im.onload = () => {
     const tex = new THREE.Texture(im);
     tex.needsUpdate = true; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
-    // sin luces ni sombras (MeshBasicMaterial), detrás del modelo (el plano está lejos en el eje de la vista) y sin intervenir en la selección
+    
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: d.opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
     mesh.raycast = () => {}; mesh.renderOrder = -5; mesh.visible = false;
     refGroup.add(mesh);
@@ -908,17 +888,17 @@ function refMake(d, cb) {
   im.src = d.data;
 }
 function refDispose(r) { refGroup.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.map.dispose(); r.mesh.material.dispose(); }
-function loadRefs(list) { // abre las imágenes guardadas en el proyecto (reemplaza las actuales)
+function loadRefs(list) {
   refs.slice().forEach(refDispose); refs = [];
   JSIRefs.sanitize(list).forEach(d => refMake(Object.assign(d, { ord: ++refOrd })));
   refList();
 }
-function refSync() { // la visibilidad sale del estado real de la cámara: proyección ortográfica alineada con la vista asignada
+function refSync() {
   const v = JSIRefs.viewOf(camDir(), camera === ortho), t = v ? JSIRefs.VIEWS[v].name : '';
   refs.forEach(r => { r.mesh.visible = r.visible && r.view === v; });
   if (vname.textContent !== t) vname.textContent = t;
 }
-function autoPerspCheck() { // al girar la vista fuera de los ejes se vuelve a perspectiva (como "Auto Perspective" de Blender)
+function autoPerspCheck() { 
   if (!refsReady || !autoOrtho || camera !== ortho || JSIRefs.viewOf(camDir(), true)) return;
   autoOrtho = false;
   Promise.resolve().then(() => setProj('persp'));
@@ -962,7 +942,7 @@ function importRefs(files) {
     const rd = new FileReader();
     rd.onload = () => {
       const im = new Image();
-      im.onload = () => { // máximo 2048 px para cuidar la memoria y el tamaño del .JSI
+      im.onload = () => { 
         const s = Math.min(1, 2048 / Math.max(im.width, im.height)), cv = document.createElement('canvas');
         cv.width = Math.max(1, Math.round(im.width * s)); cv.height = Math.max(1, Math.round(im.height * s));
         cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
@@ -978,7 +958,6 @@ function importRefs(files) {
 $('#reffile').onchange = e => { importRefs(e.target.files); e.target.value = ''; };
 refsReady = true;
 
-/* ---------- Visualización: modos de vista, proyección y visibilidad ---------- */
 function updateVBar() {
   document.querySelectorAll('[data-vm]').forEach(b => b.classList.toggle('on', b.dataset.vm === viewMode));
   document.querySelectorAll('[data-proj]').forEach(b => b.classList.toggle('on', (b.dataset.proj === 'ortho') === (camera === ortho)));
@@ -993,7 +972,7 @@ function setProj(mode, auto) {
   to.position.copy(orbit.target).addScaledVector(dir, dist); to.quaternion.copy(camera.quaternion);
   camera = to; orbit.object = to; tc.camera = to;
   to.updateMatrixWorld(); orbit.update(); updateVBar(); render();
-  autoOrtho = !!auto; // true solo si la ortográfica la activó una vista numérica (al girar se vuelve a perspectiva)
+  autoOrtho = !!auto; 
 }
 function toggleVis(o) {
   if (edit) return toast('Sal del modo edición (Tab) primero');
@@ -1008,19 +987,18 @@ function showAll() {
   refreshList(); render(); commit();
 }
 
-/* ---------- Geometría editada: normales, UV y reemplazo de malla ---------- */
 function shade(o) {
   const g = o.geometry;
   g.computeVertexNormals();
   if (!g.index) {
     const P = g.attributes.position, N = g.attributes.normal, n = P.count;
-    if (o.userData.smooth) { // suaviza promediando las normales de vértices en la misma posición
+    if (o.userData.smooth) {
       const acc = new Map(), key = i => Math.round(P.getX(i) * 1e4) + ',' + Math.round(P.getY(i) * 1e4) + ',' + Math.round(P.getZ(i) * 1e4);
       for (let i = 0; i < n; i++) { const k = key(i), a = acc.get(k) || [0, 0, 0]; a[0] += N.getX(i); a[1] += N.getY(i); a[2] += N.getZ(i); acc.set(k, a); }
       for (let i = 0; i < n; i++) { const a = acc.get(key(i)), l = Math.hypot(a[0], a[1], a[2]) || 1; N.setXYZ(i, a[0] / l, a[1] / l, a[2] / l); }
       N.needsUpdate = true;
     }
-    if (!g.attributes.uv) { // proyección en caja, para poder texturizar mallas editadas
+    if (!g.attributes.uv) { 
       const uv = new Float32Array(n * 2);
       for (let t = 0; t + 2 < n; t += 3) {
         const A = [P.getX(t), P.getY(t), P.getZ(t)], u = [P.getX(t + 1) - A[0], P.getY(t + 1) - A[1], P.getZ(t + 1) - A[2]], v = [P.getX(t + 2) - A[0], P.getY(t + 2) - A[1], P.getZ(t + 2) - A[2]];
@@ -1046,7 +1024,6 @@ function applyGeo(o, arr, smooth, faceTris) {
   shade(o); uvRebuild();
 }
 
-/* ---------- Modificadores (se aplican sobre la malla; Ctrl+Z los deshace) ---------- */
 const MODTXT = { mirror: 'Mirror aplicado', subdivide: 'Subdivisión aplicada', bevel: 'Bisel aplicado', solidify: 'Grosor aplicado' };
 function applyMod(name, ...args) {
   if (!sel) return toast('Selecciona un objeto primero');
@@ -1068,7 +1045,6 @@ function modAction(b) {
   else applyMod('subdivide');
 }
 
-/* ---------- Materiales y texturas ---------- */
 const PRESETS = {
   'Mate': { metalness: 0, roughness: 1, opacity: 1 },
   'Plástico': { metalness: 0, roughness: 0.35, opacity: 1 },
@@ -1101,7 +1077,7 @@ function importTexture(file) {
   const o = sel, r = new FileReader();
   r.onload = () => {
     const im = new Image();
-    im.onload = () => { // se reduce a 1024 px como máximo para que el .JSI no pese de más
+    im.onload = () => { 
       const s = Math.min(1, 1024 / Math.max(im.width, im.height)), cv = document.createElement('canvas');
       cv.width = Math.max(1, Math.round(im.width * s)); cv.height = Math.max(1, Math.round(im.height * s));
       cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
@@ -1134,7 +1110,6 @@ document.addEventListener('change', e => {
   setMat(sel, PRESETS[e.target.value]); commit(); e.target.value = '';
 });
 
-/* ---------- Panel de propiedades ---------- */
 const props = $('#props');
 const axes3 = (label, key) => `<div class="row"><label>${label}</label>${['x', 'y', 'z'].map(a =>
   `<input type="number" step="0.1" data-k="${key}${a}">`).join('')}</div>`;
@@ -1184,7 +1159,6 @@ props.addEventListener('input', () => {
 });
 props.addEventListener('change', () => { refreshProps(); if (edit) updatePivot(); commit(); });
 
-/* ---------- Lista de objetos ---------- */
 function refreshList() {
   const L = $('#list');
   L.innerHTML = '';
@@ -1204,8 +1178,7 @@ function refreshList() {
   });
 }
 
-/* ---------- Serialización .JSI ---------- */
-function serialize(withRefs) { // withRefs: solo al guardar el archivo (el historial de deshacer no copia las imágenes)
+function serialize(withRefs) {
   return JSON.stringify({
     format: 'JSI', version: 1,
     refs: withRefs ? refsOut() : undefined,
@@ -1259,7 +1232,6 @@ function loadData(d, keepCounters) {
   if (wasEdit && sel) enterEdit();
 }
 
-/* ---------- Historial (deshacer / rehacer) ---------- */
 let hist = [], idx = -1, dirty = false;
 function commit() {
   const s = serialize();
@@ -1271,7 +1243,6 @@ function commit() {
 function undo() { if (idx > 0) { idx--; loadData(JSON.parse(hist[idx]), true); dirty = true; } else toast('Nada que deshacer'); }
 function redo() { if (idx < hist.length - 1) { idx++; loadData(JSON.parse(hist[idx]), true); dirty = true; } else toast('Nada que rehacer'); }
 
-/* ---------- Acciones ---------- */
 let projectName = '';
 function updateTitle() { $('#title').textContent = (projectName || 'Sin título') + (dirty ? ' •' : '') + (edit ? '  [MODO EDICIÓN]' : ''); }
 let tt;
@@ -1355,6 +1326,202 @@ function exportOBJ() {
   setTimeout(() => download(base + '.mtl', mtl, 'text/plain'), 300);
   toast('Exportado ' + base + '.obj y ' + base + '.mtl (guarda ambos en la misma carpeta)');
 }
+
+
+function importModelFile(file) {
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['obj', 'fbx', 'glb', 'gltf'].includes(ext)) {
+    toast('Formato no compatible.', true);
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onerror = () => toast('No se pudo leer el archivo.', true);
+
+  reader.onload = () => {
+    try {
+      if (ext === 'obj') {
+        const loader = new THREE.OBJLoader();
+        const object = loader.parse(reader.result);
+        finishModelImport(object, file.name);
+      } else if (ext === 'fbx') {
+        const loader = new THREE.FBXLoader();
+        const object = loader.parse(reader.result, '');
+        finishModelImport(object, file.name);
+      } else {
+        const loader = new THREE.GLTFLoader();
+
+        loader.parse(
+          reader.result,
+          '',
+          gltf => finishModelImport(gltf.scene, file.name),
+          error => {
+            console.error(error);
+            toast('No se pudo importar el modelo GLTF/GLB.', true);
+          }
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      toast('Error al importar: ' + error.message, true);
+    }
+  };
+
+  if (ext === 'obj') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function finishModelImport(object, filename) {
+  if (!object) {
+    toast('El archivo no contiene un modelo válido.', true);
+    return;
+  }
+
+  object.updateMatrixWorld(true);
+
+  const meshes = [];
+
+  object.traverse(child => {
+    if (child.isMesh && child.geometry &&
+        child.geometry.attributes.position) {
+      meshes.push(child);
+    }
+  });
+
+  if (!meshes.length) {
+    toast('No se encontraron mallas en el archivo.', true);
+    return;
+  }
+
+  let imported = 0;
+  let last = null;
+
+  meshes.forEach((mesh, index) => {
+    try {
+      let geometry = mesh.geometry.clone();
+
+      if (geometry.index) geometry = geometry.toNonIndexed();
+
+      geometry.applyMatrix4(mesh.matrixWorld);
+
+      const position = geometry.getAttribute('position');
+      if (!position || position.count < 3) {
+        geometry.dispose();
+        return;
+      }
+
+      const sourceMaterial = Array.isArray(mesh.material)
+        ? mesh.material[0]
+        : mesh.material;
+
+      const color = sourceMaterial && sourceMaterial.color
+        ? '#' + sourceMaterial.color.getHexString()
+        : '#9aa4b2';
+
+      const opacity = sourceMaterial &&
+        Number.isFinite(sourceMaterial.opacity)
+        ? sourceMaterial.opacity
+        : 1;
+
+      const name = mesh.name ||
+        filename.replace(/\.[^.]+$/, '') +
+        (meshes.length > 1 ? '_' + (index + 1) : '');
+
+      const data = {
+        name: name,
+        soup: true,
+        vertices: Array.from(position.array),
+        material: {
+          color: color,
+          metalness: sourceMaterial?.metalness ?? 0.1,
+          roughness: sourceMaterial?.roughness ?? 0.6,
+          opacity: opacity
+        }
+      };
+
+      last = addObject('box', data);
+      imported++;
+
+      geometry.dispose();
+    } catch (error) {
+      console.error('Error al convertir una malla:', error);
+    }
+  });
+
+  if (!imported) {
+    toast('No se pudo convertir ninguna malla.', true);
+    return;
+  }
+
+  if (last) select(last);
+
+  commit();
+  render();
+
+  toast('Importación completada: ' + imported +
+        ' malla(s). Guarda el proyecto como JSI.');
+}
+
+
+function exportGLB() {
+  if (!root.children.length) {
+    toast('No hay objetos para exportar.', true);
+    return;
+  }
+
+  if (!THREE.GLTFExporter) {
+    toast('No está cargado el exportador GLB.', true);
+    return;
+  }
+
+  const exporter = new THREE.GLTFExporter();
+  const base = safe(projectName || 'modelo');
+
+  exporter.parse(
+    root,
+    result => {
+      if (!(result instanceof ArrayBuffer)) {
+        toast('El exportador no generó un GLB binario.', true);
+        return;
+      }
+
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(
+        new Blob([result], { type: 'model/gltf-binary' })
+      );
+
+      a.href = url;
+      a.download = base + '.glb';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast('Modelo exportado: ' + base + '.glb');
+    },
+    error => {
+      console.error(error);
+      toast('Error al exportar GLB: ' + error.message, true);
+    },
+    {
+      binary: true,
+      onlyVisible: true,
+      trs: false
+    }
+  );
+}
+
+function exportFBX() {
+  toast(
+    'La exportación FBX requiere integrar un exportador adicional. ' +
+    'Por ahora, exporta el modelo como GLB.',
+    true
+  );
+}
+
 function setTool(t) {
   tc.setMode(t);
   document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
@@ -1366,7 +1533,15 @@ const ACT = {
   projp: () => setProj('persp'), projo: () => setProj('ortho'), projt: () => setProj(camera === ortho ? 'persp' : 'ortho'), selall: () => selOp('all'), selnone: () => selOp('none'), selinv: () => selOp('inv'),
   vfront: () => setView(0, 0, 1), vside: () => setView(1, 0, 0), vtop: () => setView(0, 1, 0.0001), vpersp: () => { setProj('persp'); setView(5, 4, 6, true); },
   vback: () => setView(0, 0, -1), vleft: () => setView(-1, 0, 0), vbottom: () => setView(0, -1, 0.0001),
-  vall: frameAll, axes: () => { axes.visible = !axes.visible; render(); }, open: () => $('#file').click(), save, saveas: saveAs, obj: exportOBJ,
+  vall: frameAll, axes: () => { axes.visible = !axes.visible; render(); }, 
+open: () => $('#file').click(),
+importmodel: () => $('#importModelFile').click(),
+save,
+saveas: saveAs,
+obj: exportOBJ,
+glb: exportGLB,
+fbx: exportFBX,
+
   undo, redo, dup: duplicate, del: remove,
   focus: () => { if (sel) { orbit.target.copy(sel.position); orbit.update(); render(); } }
 };
@@ -1390,6 +1565,11 @@ $('#file').onchange = e => { openFile(e.target.files[0]); e.target.value = ''; }
 $('#bg').oninput = e => { scene.background.set(e.target.value); render(); };
 $('#bg').onchange = commit;
 $('#gridv').onchange = e => { grid.visible = e.target.checked; render(); commit(); };
+
+$('#importModelFile').onchange = e => {
+  importModelFile(e.target.files[0]);
+  e.target.value = '';
+};
 
 document.addEventListener('keydown', e => {
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
@@ -1426,7 +1606,6 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
-/* ---------- Inicio ---------- */
 addObject('box', { position: [0, 0.5, 0] });
 commit(); dirty = false; updateTitle(); refreshList(); refreshProps(); setHint();
 })();
